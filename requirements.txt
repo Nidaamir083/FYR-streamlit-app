@@ -3,15 +3,11 @@ pandas==2.0.3
 numpy==1.24.3
 matplotlib==3.7.2
 seaborn==0.12.2
-openai==0.28.1
 transformers==4.31.0
 torch==2.0.1
 biopython==1.81
 arxiv==1.4.7
 wikipedia-api==0.5.8
-langchain==0.0.346
 requests==2.31.0
 tqdm==4.65.0
-markdown-it-py==2.2.0
-rich==13.7.0
-python-dotenv==1.0.0
+sentence-transformers==2.2.2
