@@ -4,7 +4,7 @@ matplotlib
 seaborn
 openai
 transformers
-torch==2.1.0
+torch>=2.5.0
 langchain
 biopython
 arxiv
