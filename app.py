@@ -20,7 +20,7 @@ Entrez.email = "nida.amir@gmail.com"
 
 @st.cache_resource
 def load_model():
-    return pipeline("text2text-generation", model="google/flan-t5-base")
+    return pipeline("text2text-generation", model="google/flan-t5-small")
 
 qa_pipeline = load_model()
 
@@ -99,13 +99,14 @@ def ask_scientific_question(question, context):
 
 def answer_with_llm(question, abstracts):
     try:
-        chat = ChatOpenAI(model="gpt-3.5-turbo")
         context = "\n\n".join(doc.get('summary', '') or doc.get('abstract', '') for doc in abstracts[:3])
-        response = chat([HumanMessage(content=f"Context: {context}\n\nQuestion: {question}")])
-        return response.content
+        prompt = f"Based on this research: {context}\n\nAnswer this question: {question}"
+        answer = qa_pipeline(prompt, max_length=200)[0]["generated_text"]
+        return answer
+        
     except Exception as e:
         st.error(f"Failed to generate answer: {str(e)}")
-        return "Could not generate answer due to an error."
+        return "Could not generate answer. Please try a different question."
 
 # Streamlit UI setup
 st.set_page_config(page_title="Find Your Research", layout="wide")
