@@ -10,7 +10,8 @@ from transformers import pipeline
 import streamlit as st
 from Bio import Entrez
 import arxiv
-import wikipedia
+import wikipediaapi
+
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 
@@ -33,11 +34,17 @@ def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20)
     return pd.DataFrame({"abstract": abstracts, "source": ["PubMed"] * len(abstracts)})
 
 def get_wikipedia_background(topic):
-    try:
-        summary = wikipedia.summary(topic, sentences=5)
-        return [{"source": "Wikipedia", "title": topic, "date": topic, "summary": summary}]
-    except Exception:
-        return []
+    wiki_wiki = wikipediaapi.Wikipedia('en')
+    page = wiki_wiki.page(topic)
+    if page.exists():
+        return [{
+            "source": "Wikipedia",
+            "title": topic,
+            "date": topic,
+            "summary": page.summary[:500]
+        }]
+    return []
+
 
 def fetch_arxiv_articles(query, max_results=5):
     search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
