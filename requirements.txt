@@ -1,13 +1,15 @@
-streamlit
-pandas
-matplotlib
-seaborn
-openai
-transformers
-torch>=2.5.0
-langchain
-biopython
-arxiv
-wikipedia-api
+streamlit>=1.32.0
+pandas>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+openai>=1.0.0
+transformers>=4.30.0
+torch>=2.0.0
+biopython>=1.81
+arxiv>=1.4.7
+wikipedia-api>=0.5.8
+langchain>=0.0.200
+requests>=2.31.0
+tqdm>=4.65.0
 
 
