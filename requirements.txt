@@ -1,27 +1,16 @@
-# Core packages
 streamlit
-openai
 biopython
 arxiv
 wikipedia
-
-# LangChain (latest working versions as of May 2025)
-langchain==0.1.17
-langchain-community==0.0.27
-langchain-core==0.1.51
-
-# Transformers stack
-transformers==4.40.0
-datasets==2.19.0
-sentence-transformers==2.5.1
-
-# Optional visualization
-matplotlib
+langchain
+langchain-community
+langchain-core
+openai
+transformers
+torch==2.1.0
+tensorflow
+datasets
+sentence-transformers
 seaborn
-
-# Deep learning backend (choose ONE):
-# torch and tensorflow can conflict on Streamlit Cloud
-# Uncomment the one you need:
-
-# torch==2.1.0
-# tensorflow==2.15.0
+matplotlib
+pandas
