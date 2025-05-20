@@ -126,8 +126,8 @@ if question and custom_query:
         visualize_results(data)  
 
 st.subheader("📚 Sources")
-    for doc in data:
-        st.markdown(f"- **{doc.get('source')}**: {doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))[:80]}...")
+for doc in data:
+    st.markdown(f"- **{doc.get('source')}**: {doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))[:80]}...")
 
     st.subheader("🧠 Ask a Scientific Question")
     question = st.text_input("What would you like to ask?", "What AI tools are used in the diagnosis of Thyroid cancer?")
