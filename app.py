@@ -12,7 +12,7 @@ from Bio import Entrez
 import arxiv
 import wikipediaapi
 
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 
 
@@ -24,6 +24,7 @@ def load_model():
 
 qa_pipeline = load_model()
 
+@st.cache_data
 def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
     handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
                             maxdate=f"{end_year}/12/31", retmax=max_results)
@@ -46,6 +47,7 @@ def get_wikipedia_background(topic):
     return []
 
 
+@st.cache_data
 def fetch_arxiv_articles(query, max_results=5):
     search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
     articles = []
@@ -122,10 +124,11 @@ question = st.text_input("Ask a research question:")
 
 if question and custom_query:
     with st.spinner("🔎 Searching Sources and generating answer..."):
-        abstracts = build_merged_report(custom_query)
-        answer = answer_with_llm(question, abstracts)
-        st.success("✅ Answer:")
-        st.write(answer)
+        try:
+    abstracts = build_merged_report(custom_query)
+except Exception as e:
+    st.error(f"Error fetching research: {str(e)}")
+    abstracts = []
 
         st.subheader("📄 Retrieved Abstracts")
         with st.expander("Click to show abstracts"):
