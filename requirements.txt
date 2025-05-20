@@ -1,11 +1,9 @@
 streamlit
 biopython
 arxiv
-wikipedia
-langchain
-langchain-community
-langchain-core
+wikipedia-api
 openai
+langchain
 transformers
 torch==2.1.0
 tensorflow
@@ -14,3 +12,4 @@ sentence-transformers
 seaborn
 matplotlib
 pandas
+
