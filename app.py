@@ -15,7 +15,7 @@ import wikipediaapi
 from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 
-
+# Configuration
 Entrez.email = "nida.amir@gmail.com"
 
 @st.cache_resource
@@ -28,7 +28,7 @@ qa_pipeline = load_model()
 def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
     try:
         handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
-                                maxdate=f"{end_year}/12/31", retmax=max_results)
+                              maxdate=f"{end_year}/12/31", retmax=max_results)
         record = Entrez.read(handle)
         ids = record["IdList"]
         if not ids:
@@ -39,7 +39,7 @@ def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20)
     except Exception as e:
         st.error(f"PubMed query failed: {str(e)}")
         return pd.DataFrame(columns=["abstract", "source"])
-        
+
 def get_wikipedia_background(topic):
     wiki_wiki = wikipediaapi.Wikipedia('en')
     page = wiki_wiki.page(topic)
@@ -52,20 +52,23 @@ def get_wikipedia_background(topic):
         }]
     return []
 
-
 @st.cache_data
 def fetch_arxiv_articles(query, max_results=5):
-    search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
-    articles = []
-    for result in search.results():
-        if 2015 <= result.published.year <= 2024:
-            articles.append({
-                "source": "arXiv",
-                "title": result.title,
-                "date": result.published,
-                "summary": result.summary
-            })
-    return articles
+    try:
+        search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
+        articles = []
+        for result in search.results():
+            if 2015 <= result.published.year <= 2024:
+                articles.append({
+                    "source": "arXiv",
+                    "title": result.title,
+                    "date": result.published,
+                    "summary": result.summary
+                })
+        return articles
+    except Exception as e:
+        st.error(f"arXiv query failed: {str(e)}")
+        return []
 
 def build_merged_report(topic, pubmed_limit=5, arxiv_limit=5):
     pubmed = fetch_pubmed_articles(topic, max_results=pubmed_limit)
@@ -74,6 +77,10 @@ def build_merged_report(topic, pubmed_limit=5, arxiv_limit=5):
     return pubmed.to_dict('records') + arxiv_articles + wiki
 
 def visualize_results(data):
+    if not data:
+        st.warning("No data to visualize")
+        return
+    
     for doc in data:
         doc['source'] = doc.get('source', 'Unknown')
     df = pd.DataFrame(data)
@@ -81,8 +88,8 @@ def visualize_results(data):
     sns.countplot(data=df, x='source', order=df['source'].value_counts().index, palette='pastel', ax=ax)
     for p in ax.patches:
         ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
-                    ha='center', va='center', fontsize=11, color='black', xytext=(0, 5),
-                    textcoords='offset points')
+                   ha='center', va='center', fontsize=11, color='black', xytext=(0, 5),
+                   textcoords='offset points')
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
@@ -91,10 +98,14 @@ def ask_scientific_question(question, context):
     return qa_pipeline(prompt, max_new_tokens=300)[0]["generated_text"].strip()
 
 def answer_with_llm(question, abstracts):
-    chat = ChatOpenAI(model="gpt-3.5-turbo")
-    context = "\n\n".join(doc.get('summary', '') or doc.get('abstract', '') for doc in abstracts[:3])
-    response = chat([HumanMessage(content=f"Context: {context}\n\nQuestion: {question}")])
-    return response.content
+    try:
+        chat = ChatOpenAI(model="gpt-3.5-turbo")
+        context = "\n\n".join(doc.get('summary', '') or doc.get('abstract', '') for doc in abstracts[:3])
+        response = chat([HumanMessage(content=f"Context: {context}\n\nQuestion: {question}")])
+        return response.content
+    except Exception as e:
+        st.error(f"Failed to generate answer: {str(e)}")
+        return "Could not generate answer due to an error."
 
 # Streamlit UI setup
 st.set_page_config(page_title="Find Your Research", layout="wide")
@@ -131,20 +142,24 @@ question = st.text_input("Ask a research question:")
 if question and custom_query:
     with st.spinner("🔎 Searching Sources and generating answer..."):
         try:
-    abstracts = build_merged_report(custom_query)
-except Exception as e:
-    st.error(f"Error fetching research: {str(e)}")
-    abstracts = []
+            abstracts = build_merged_report(custom_query)
+            
+            st.subheader("📄 Retrieved Abstracts")
+            with st.expander("Click to show abstracts"):
+                for doc in abstracts:
+                    content = doc.get('abstract', doc.get('summary', ''))
+                    st.markdown(f"**{doc.get('source')}**")
+                    st.markdown(f"```\n{content[:500]}...\n```")
+            
+            st.subheader("📊 Source Distribution")
+            visualize_results(abstracts)
+            
+            st.subheader("🤖 Generated Answer")
+            answer = answer_with_llm(question, abstracts)
+            st.markdown(answer)
+            
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+    
 
-        st.subheader("📄 Retrieved Abstracts")
-        with st.expander("Click to show abstracts"):
-            for abs in abstracts:
-                st.markdown(f"<pre>{abs}</pre>", unsafe_allow_html=True)
 
-        st.subheader("📊 Source Distribution")
-        visualize_results(abstracts)
-
-        st.subheader("📚 Sources")
-        for doc in abstracts:
-            title = doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))
-            st.markdown(f"- **{doc.get('source')}**: {title[:80]}...")
