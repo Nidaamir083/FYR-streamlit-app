@@ -3,18 +3,22 @@ import streamlit as st
 from Bio import Entrez
 import arxiv
 import wikipedia
-from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
+from langchain_community.chat_models import ChatOpenAI
+from langchain_core.messages import HumanMessage
+
 
 # 🔧 Config
 st.set_page_config(page_title="GenAI Scientific QA", layout="wide")
+
+background_url = "https://tradebrains-wp.s3.ap-south-1.amazonaws.com/features/wp-content/uploads/2024/08/How-to-Avoid-Grammatical-Errors-in-Your-Research-Papers-1080x628.jpg"
+
 
 # 🎨 Custom background
 st.markdown(
     f'''
     <style>
         .stApp {{
-            background-image: url("background.webp");
+            background-image: url("{background_url}");
             background-size: cover;
             background-attachment: fixed;
         }}
