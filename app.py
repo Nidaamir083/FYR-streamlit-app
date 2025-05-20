@@ -11,8 +11,9 @@ import streamlit as st
 from Bio import Entrez
 import arxiv
 import wikipedia
-from langchain_community.chat_models import ChatOpenAI
-from langchain_core.messages import HumanMessage
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+
 
 Entrez.email = "nida.amir@gmail.com"
 
