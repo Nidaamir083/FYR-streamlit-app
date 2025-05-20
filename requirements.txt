@@ -1,0 +1,6 @@
+streamlit
+biopython
+arxiv
+wikipedia
+langchain
+openai
