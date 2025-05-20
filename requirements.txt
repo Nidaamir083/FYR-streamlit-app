@@ -1,15 +1,13 @@
 streamlit
+pandas
+matplotlib
+seaborn
+openai
+transformers
+torch==2.1.0
+langchain
 biopython
 arxiv
 wikipedia-api
-openai
-langchain
-transformers
-torch==2.1.0
-tensorflow
-datasets
-sentence-transformers
-seaborn
-matplotlib
-pandas
+
 
