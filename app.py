@@ -26,14 +26,20 @@ qa_pipeline = load_model()
 
 @st.cache_data
 def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
-    handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
-                            maxdate=f"{end_year}/12/31", retmax=max_results)
-    record = Entrez.read(handle)
-    ids = record["IdList"]
-    handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
-    abstracts = [a.strip() for a in handle.read().split("\n\n") if len(a.strip()) > 100]
-    return pd.DataFrame({"abstract": abstracts, "source": ["PubMed"] * len(abstracts)})
-
+    try:
+        handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
+                                maxdate=f"{end_year}/12/31", retmax=max_results)
+        record = Entrez.read(handle)
+        ids = record["IdList"]
+        if not ids:
+            return pd.DataFrame(columns=["abstract", "source"])
+        handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
+        abstracts = [a.strip() for a in handle.read().split("\n\n") if len(a.strip()) > 100]
+        return pd.DataFrame({"abstract": abstracts, "source": ["PubMed"] * len(abstracts)})
+    except Exception as e:
+        st.error(f"PubMed query failed: {str(e)}")
+        return pd.DataFrame(columns=["abstract", "source"])
+        
 def get_wikipedia_background(topic):
     wiki_wiki = wikipediaapi.Wikipedia('en')
     page = wiki_wiki.page(topic)
