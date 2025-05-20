@@ -11,5 +11,5 @@ wikipedia-api>=0.5.8
 langchain>=0.0.200
 requests>=2.31.0
 tqdm>=4.65.0
-
+python-3.11.8
 
