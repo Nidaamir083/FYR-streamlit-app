@@ -3,4 +3,5 @@ biopython
 arxiv
 wikipedia
 langchain
+langchain-community
 openai
