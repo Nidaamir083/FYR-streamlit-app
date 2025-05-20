@@ -5,3 +5,10 @@ wikipedia
 langchain
 langchain-community
 openai
+matplotlib
+torch==2.1.0
+tensorflow
+transformers
+datasets
+sentence-transformers
+seaborn
