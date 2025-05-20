@@ -79,7 +79,7 @@ def ask_scientific_question(question, context):
 # 🔧 Config
 st.set_page_config(page_title="Find Your Research", layout="wide")
 
-background_url = "https://tradebrains-wp.s3.ap-south-1.amazonaws.com/features/wp-content/uploads/2024/08/How-to-Avoid-Grammatical-Errors-in-Your-Research-Papers-1080x628.jpg"
+background_url = "https://www.yomu.ai/_next/image?url=https%3A%2F%2Fmars-images.imgix.net%2Fseobot%2Fyomu.ai%2F66fddfacb73bfea48e23e839-f6ce70040dea2c7b011ccfe0680258d1.png%3Fauto%3Dcompress&w=1920&q=75"
 
 
 # 🎨 Custom background
