@@ -70,19 +70,20 @@ def visualize_results(data):
     plt.xticks(rotation=45)
     st.pyplot(fig)
 
-
 def ask_scientific_question(question, context):
     prompt = f"Context: {context}\n\nQuestion: {question}"
     return qa_pipeline(prompt, max_new_tokens=300)[0]["generated_text"].strip()
 
+def answer_with_llm(question, abstracts):
+    chat = ChatOpenAI(model="gpt-3.5-turbo")
+    context = "\n\n".join(doc.get('summary', '') or doc.get('abstract', '') for doc in abstracts[:3])
+    response = chat([HumanMessage(content=f"Context: {context}\n\nQuestion: {question}")])
+    return response.content
 
-# 🔧 Config
+# Streamlit UI setup
 st.set_page_config(page_title="Find Your Research", layout="wide")
 
 background_url = "https://www.yomu.ai/_next/image?url=https%3A%2F%2Fmars-images.imgix.net%2Fseobot%2Fyomu.ai%2F66fddfacb73bfea48e23e839-f6ce70040dea2c7b011ccfe0680258d1.png%3Fauto%3Dcompress&w=1920&q=75"
-
-
-# 🎨 Custom background
 st.markdown(
     f'''
     <style>
@@ -96,63 +97,37 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# 🧠 Title and header
 st.markdown("<h1 style='color: #4CAF50;'>🔬 Find Your Research</h1>", unsafe_allow_html=True)
+
+# Sidebar
 st.sidebar.markdown("## 🧪 Select a Research Topic")
+predefined_topics = ["AI in healthcare", "Thyroid cancer treatment", "CRISPR gene editing", "Drug repurposing"]
+selected_topic = st.sidebar.selectbox("Choose a topic or type custom:", predefined_topics + ["Custom"])
 
-# 🔽 Dropdown to select topic
-# Sidebar dropdown with only "Custom"
-topics = ["Custom"]
-selected_topic = st.sidebar.selectbox("Choose a scientific topic:", topics)
+custom_query = ""
+if selected_topic == "Custom":
+    custom_query = st.sidebar.text_input("Enter your custom topic:")
+else:
+    custom_query = selected_topic
 
-# User must enter their custom topic
-custom_query = st.sidebar.text_input("Enter your custom topic (e.g., 'AI in thyroid cancer')")
-
-# Question input
 question = st.text_input("Ask a research question:")
 
-# Run only if both are provided
 if question and custom_query:
     with st.spinner("🔎 Searching Sources and generating answer..."):
         abstracts = build_merged_report(custom_query)
         answer = answer_with_llm(question, abstracts)
         st.success("✅ Answer:")
         st.write(answer)
-        with st.expander("📄 Show retrieved abstracts"):
+
+        st.subheader("📄 Retrieved Abstracts")
+        with st.expander("Click to show abstracts"):
             for abs in abstracts:
                 st.markdown(f"<pre>{abs}</pre>", unsafe_allow_html=True)
 
         st.subheader("📊 Source Distribution")
-        visualize_results(data)  
+        visualize_results(abstracts)
 
-st.subheader("📚 Sources")
-for doc in data:
-    st.markdown(f"- **{doc.get('source')}**: {doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))[:80]}...")
-
-    st.subheader("🧠 Ask a Scientific Question")
-    question = st.text_input("What would you like to ask?", "What AI tools are used in the diagnosis of Thyroid cancer?")
-    if st.button("Get Answer"):
-        context_texts = " ".join(doc.get('summary', '') or doc.get('abstract', '') for doc in data)[:4000]
-        answer = ask_scientific_question(question, context_texts)
-        st.markdown("### 🤖 Answer")
-        st.write(answer)
-
-
-
-# 🤖 LLM-based answer (simplified)
-def answer_with_llm(question, abstracts):
-    chat = ChatOpenAI(model="gpt-3.5-turbo")
-    context = "\n\n".join(abstracts[:3])  # use top 3 abstracts
-    response = chat([HumanMessage(content=f"Context: {context}\n\nQuestion: {question}")])
-    return response.content
-
-# ▶️ Run pipeline
-if question:
-    with st.spinner("🔎 Searching Sources and generating answer..."):
-        abstracts =  build_merged_report(selected_topic)
-        answer = answer_with_llm(question, abstracts)
-        st.success("✅ Answer:")
-        st.write(answer)
-        with st.expander("📄 Show retrieved abstracts"):
-            for abs in abstracts:
-                st.markdown(f"<pre>{abs}</pre>", unsafe_allow_html=True)
+        st.subheader("📚 Sources")
+        for doc in abstracts:
+            title = doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))
+            st.markdown(f"- **{doc.get('source')}**: {title[:80]}...")
