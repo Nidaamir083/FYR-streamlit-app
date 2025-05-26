@@ -3,12 +3,14 @@ os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
 
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import wikipedia
 import arxiv
 from Bio import Entrez
 from transformers import pipeline
+import base64
+from PIL import Image
+import requests
+from io import BytesIO
 
 # Initialize Entrez
 Entrez.email = "nida.amir0083@gmail.com"
@@ -35,6 +37,13 @@ def get_wikipedia_background(topic):
     try:
         summary = wikipedia.summary(topic, sentences=3)
         return [{"source": "Wikipedia", "title": topic, "summary": summary}]
+    except wikipedia.exceptions.DisambiguationError as e:
+        try:
+            summary = wikipedia.summary(e.options[0], sentences=3)
+            return [{"source": "Wikipedia", "title": e.options[0], "summary": summary}]
+        except:
+            st.error(f"Wikipedia disambiguation error for: {topic}")
+            return []
     except Exception as e:
         st.error(f"Wikipedia error: {str(e)}")
         return []
@@ -46,7 +55,8 @@ def fetch_arxiv_articles(query, max_results=5):
         return [{
             "source": "arXiv",
             "title": result.title,
-            "summary": result.summary
+            "summary": result.summary,
+            "date": result.published
         } for result in search.results()]
     except Exception as e:
         st.error(f"arXiv error: {str(e)}")
@@ -63,19 +73,16 @@ def display_compact_results(data):
         st.warning("No results found. Try a different search term.")
         return
     
-    # Create DataFrame with limited columns
     df = pd.DataFrame(data)
     if 'date' not in df.columns:
         df['date'] = pd.NaT
     
-    # Select and rename columns for display
     display_df = df[['source', 'title', 'date']].rename(columns={
         'source': 'Source',
         'title': 'Title',
         'date': 'Date'
     })
     
-    # Display compact table
     st.dataframe(
         display_df,
         height=min(400, 45 * len(display_df)),
@@ -86,6 +93,25 @@ def display_compact_results(data):
             "Title": st.column_config.TextColumn(width="medium"),
             "Date": st.column_config.DateColumn(width="small")
         }
+    )
+
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as f:
+        img_data = f.read()
+    b64_encoded = base64.b64encode(img_data).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url(data:image/png;base64,{b64_encoded});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
     )
 
 # ========== APP CONFIGURATION ==========
@@ -147,21 +173,63 @@ st.markdown("""
 .stAlert {
     font-size: 14px !important;
 }
+
+/* Button styling */
+.stButton>button {
+    background-color: #2E7D32;
+    color: white;
+    border-radius: 5px;
+    padding: 8px 16px;
+    border: none;
+}
+
+.stButton>button:hover {
+    background-color: #1B5E20;
+    color: white;
+}
 </style>
 """, unsafe_allow_html=True)
 
+# Add background image (choose one method)
+# Method 1: Local image (place a file named 'background.jpg' in same directory)
+# add_bg_from_local("background.jpg")
+
+# Method 2: Online image
+def add_bg_from_url(url):
+    st.markdown(
+         f"""
+         <style>
+         .stApp {{
+             background-image: url("{url}");
+             background-size: cover;
+             background-position: center;
+             background-repeat: no-repeat;
+             background-attachment: fixed;
+         }}
+         </style>
+         """,
+         unsafe_allow_html=True
+     )
+
+add_bg_from_url("https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3")
+
 # ========== APP LAYOUT ==========
-# Replace the existing title markup with this:
-st.markdown('<h1 style="color: black; text-align: center; font-size: 2.5rem;">🔬 Find Your Research</h1>', 
+st.markdown('<h1 style="color: white; text-align: center; font-size: 2.5rem; text-shadow: 2px 2px 4px #000000;">🔬 Find Your Research</h1>', 
             unsafe_allow_html=True)
 
 # Search input
-topic = st.text_input("Enter a research topic:", 
-                     value="drug repurposing for anaplastic thyroid cancer",
-                     help="Try medical or scientific topics")
+col1, col2 = st.columns([3, 1])
+with col1:
+    topic = st.text_input("Enter a research topic:", 
+                         value="drug repurposing for anaplastic thyroid cancer",
+                         help="Try medical or scientific topics")
+with col2:
+    st.write("")
+    st.write("")
+    search_clicked = st.button("Search", type="primary")
 
 # Main content
-if st.button("Search") or topic:
+if search_clicked or topic:
     with st.spinner("Searching PubMed, arXiv, and Wikipedia..."):
         data = build_merged_report(topic)
     
@@ -174,7 +242,7 @@ if st.button("Search") or topic:
         
         # Show detailed view of first result
         st.subheader("Detailed View")
-        with st.expander(f"View {data[0]['source']} content"):
+        with st.expander(f"View {data[0]['source']} content", expanded=True):
             if 'abstract' in data[0]:
                 st.write(data[0]['abstract'])
             else:
@@ -186,16 +254,19 @@ if st.button("Search") or topic:
                                value="What are the key findings?",
                                key="question_input")
         
-        if st.button("Get Answer"):
+        if st.button("Get Answer", type="primary"):
             context = data[0].get('abstract', data[0].get('summary', ''))
-            answer = qa_pipeline(f"question: {question} context: {context}", 
-                               max_new_tokens=200)[0]["generated_text"]
-            st.info(f"**Answer:** {answer}")
-    else:
-        st.error("No results found. Please try a different search term.")
+            if context:
+                answer = qa_pipeline(f"question: {question} context: {context}", 
+                                   max_new_tokens=200)[0]["generated_text"]
+                st.info(f"**Answer:** {answer}")
+            else:
+                st.warning("No content available to generate an answer.")
 
 # Footer
 st.markdown("---")
 st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
+    
+
 
 
