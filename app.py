@@ -3,6 +3,12 @@ os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
 os.environ["PYTHONWARNINGS"] = "ignore"
 
 import streamlit as st
+st.set_page_config(
+    page_title="Find Your Research", 
+    layout="centered",
+    page_icon="🔬"
+)
+
 import pandas as pd
 import wikipedia
 import arxiv
