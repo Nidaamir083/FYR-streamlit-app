@@ -2,7 +2,6 @@ import os
 os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
 
 import streamlit as st
-from PIL import Image
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -11,15 +10,78 @@ import arxiv
 from Bio import Entrez
 from transformers import pipeline
 
-# Set page config FIRST (only once)
+# Initialize Entrez
+Entrez.email = "nida.amir0083@gmail.com"
+
+# ========== FUNCTION DEFINITIONS ==========
+@st.cache_resource
+def load_model():
+    return pipeline("text2text-generation", model="google/flan-t5-base")
+
+def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
+    handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
+                          maxdate=f"{end_year}/12/31", retmax=max_results)
+    record = Entrez.read(handle)
+    ids = record["IdList"]
+    handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
+    abstracts = [a.strip() for a in handle.read().split("\n\n") if len(a.strip()) > 100]
+    return pd.DataFrame({"abstract": abstracts, "source": ["PubMed"] * len(abstracts)})
+
+def get_wikipedia_background(topic):
+    try:
+        summary = wikipedia.summary(topic, sentences=5)
+        return [{"source": "Wikipedia", "title": topic, "date": topic, "summary": summary}]
+    except Exception:
+        return []
+
+def fetch_arxiv_articles(query, max_results=5):
+    search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
+    articles = []
+    for result in search.results():
+        if 2015 <= result.published.year <= 2024:
+            articles.append({
+                "source": "arXiv",
+                "title": result.title,
+                "date": result.published,
+                "summary": result.summary
+            })
+    return articles
+
+def build_merged_report(topic, pubmed_limit=5, arxiv_limit=5):
+    pubmed = fetch_pubmed_articles(topic, max_results=pubmed_limit)
+    arxiv_articles = fetch_arxiv_articles(topic, max_results=arxiv_limit)
+    wiki = get_wikipedia_background(topic)
+    return pubmed.to_dict('records') + arxiv_articles + wiki
+
+def visualize_results(data):
+    for doc in data:
+        doc['source'] = doc.get('source', 'Unknown')
+    df = pd.DataFrame(data)
+    fig, ax = plt.subplots()
+    sns.countplot(data=df, x='source', order=df['source'].value_counts().index, palette='pastel', ax=ax)
+    for p in ax.patches:
+        ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                   ha='center', va='center', fontsize=11, color='black', xytext=(0, 5),
+                   textcoords='offset points')
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+
+def ask_scientific_question(question, context):
+    prompt = f"Context: {context}\n\nQuestion: {question}"
+    return qa_pipeline(prompt, max_new_tokens=300)[0]["generated_text"].strip()
+
+# ========== APP CONFIGURATION ==========
 st.set_page_config(
     page_title="Find Your Research", 
     layout="wide",
     page_icon="🔬"
 )
 
-# Set background image (right after page config)
-background_url = "https://astrixinc.com/wp-content/uploads/2025/04/AI-Image-1.jpg"  # or your preferred image
+# Load model (after function definitions but before main app)
+qa_pipeline = load_model()
+
+# ========== APP LAYOUT ==========
+background_url = "https://astrixinc.com/wp-content/uploads/2025/04/AI-Image-1.jpg"
 st.markdown(
     f"""
     <style>
@@ -44,19 +106,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# App content
 st.markdown("<h1 style='text-align: center; color: #4CAF50;'>🔬 Find Your Research</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center;'>Welcome to FYR!</h3>", unsafe_allow_html=True)
 
-# Rest of your functions (fetch_pubmed_articles, get_wikipedia_background, etc.)
-# [Keep all your existing functions here...]
-
-# Sidebar
-with st.sidebar:
-    st.header("Settings")
-    option = st.selectbox("Choose an option", ["Option 1", "Option 2", "Option 3"])
-
-# Main content
+# ========== MAIN APP LOGIC ==========
 topic = st.text_input("Enter a research topic:", "drug repurposing for anaplastic thyroid cancer")
 
 if topic:
@@ -78,9 +131,6 @@ if topic:
         answer = ask_scientific_question(question, context_texts)
         st.markdown("### 🤖 Answer")
         st.write(answer)
-   
-  
-    
         
     
 
