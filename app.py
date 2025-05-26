@@ -1,5 +1,6 @@
 import os
 os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
+os.environ["PYTHONWARNINGS"] = "ignore"  # Suppress warnings
 
 import streamlit as st
 import pandas as pd
@@ -7,22 +8,26 @@ import wikipedia
 import arxiv
 from Bio import Entrez
 from transformers import pipeline
-import base64
 import asyncio
 
-# Fix for event loop error
-try:
-    asyncio.get_running_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
+# Disable Streamlit file watcher completely
+st.runtime.legacy_caching.cache_data.clear()
+st.runtime.legacy_caching.cache_resource.clear()
 
 # Initialize Entrez
 Entrez.email = "nida.amir0083@gmail.com"
 
 # ========== FUNCTION DEFINITIONS ==========
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_model():
-    return pipeline("text2text-generation", model="google/flan-t5-base")
+    try:
+        # Explicitly set device to CPU to avoid any GPU-related issues
+        return pipeline("text2text-generation", 
+                      model="google/flan-t5-base",
+                      device="cpu")
+    except Exception as e:
+        st.error(f"Model loading failed: {str(e)}")
+        return None
 
 def fetch_pubmed_articles(query, max_results=5):
     try:
@@ -46,10 +51,8 @@ def get_wikipedia_background(topic):
             summary = wikipedia.summary(e.options[0], sentences=3)
             return [{"source": "Wikipedia", "title": e.options[0], "summary": summary}]
         except:
-            st.error(f"Wikipedia disambiguation error for: {topic}")
             return []
     except Exception as e:
-        st.error(f"Wikipedia error: {str(e)}")
         return []
 
 def fetch_arxiv_articles(query, max_results=5):
@@ -100,22 +103,6 @@ def display_compact_results(data):
         }
     )
 
-def add_bg_from_url(url):
-    st.markdown(
-         f"""
-         <style>
-         .stApp {{
-             background-image: url("{url}");
-             background-size: cover;
-             background-position: center;
-             background-repeat: no-repeat;
-             background-attachment: fixed;
-         }}
-         </style>
-         """,
-         unsafe_allow_html=True
-     )
-
 # ========== APP CONFIGURATION ==========
 st.set_page_config(
     page_title="Find Your Research", 
@@ -123,30 +110,16 @@ st.set_page_config(
     page_icon="🔬"
 )
 
-# Load model
-try:
-    qa_pipeline = load_model()
-except Exception as e:
-    st.error(f"Failed to load model: {str(e)}")
-    st.stop()
-
-# Add background
-add_bg_from_url("https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3")
+# Load model with error handling
+qa_pipeline = load_model()
+if qa_pipeline is None:
+    st.error("Failed to initialize the AI model. The Q&A feature will be disabled.")
+    qa_enabled = False
+else:
+    qa_enabled = True
 
 # ========== APP LAYOUT ==========
-st.markdown("""
-<style>
-/* Main content container */
-.st-emotion-cache-1y4p8pa {
-    background-color: rgba(255, 255, 255, 0.9) !important;
-    border-radius: 10px;
-    padding: 2rem !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<h1 style="color: white; text-align: center; font-size: 2.5rem; text-shadow: 2px 2px 4px #000000;">🔬 Find Your Research</h1>', 
-            unsafe_allow_html=True)
+st.title("🔬 Find Your Research")
 
 # Search input
 topic = st.text_input("Enter a research topic:", 
@@ -169,36 +142,27 @@ if st.button("Search", type="primary") or topic:
             else:
                 st.write(data[0]['summary'])
         
-        st.subheader("Ask About This Research")
-        question = st.text_input("Your question:", 
-                               value="What are the key findings?",
-                               key="question_input")
-        
-        if st.button("Get Answer", type="primary"):
-            context = data[0].get('abstract', data[0].get('summary', ''))
-            if context:
-                try:
-                    answer = qa_pipeline(f"question: {question} context: {context}", 
-                                       max_new_tokens=200)[0]["generated_text"]
-                    st.info(f"**Answer:** {answer}")
-                except Exception as e:
-                    st.error(f"Error generating answer: {str(e)}")
-            else:
-                st.warning("No content available to generate an answer.")
+        if qa_enabled:
+            st.subheader("Ask About This Research")
+            question = st.text_input("Your question:", 
+                                   value="What are the key findings?",
+                                   key="question_input")
+            
+            if st.button("Get Answer", type="primary"):
+                context = data[0].get('abstract', data[0].get('summary', ''))
+                if context:
+                    try:
+                        answer = qa_pipeline(
+                            f"question: {question} context: {context}", 
+                            max_new_tokens=200
+                        )[0]["generated_text"]
+                        st.info(f"**Answer:** {answer}")
+                    except Exception as e:
+                        st.error(f"Error generating answer: {str(e)}")
+                else:
+                    st.warning("No content available to generate an answer.")
 
 st.markdown("---")
 st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
-    
- 
-
-
-
-
-
-
-
-   
-    
-
 
 
