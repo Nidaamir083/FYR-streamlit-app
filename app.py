@@ -9,9 +9,61 @@ import arxiv
 from Bio import Entrez
 from transformers import pipeline
 import asyncio
+import base64
 
 # Initialize Entrez
 Entrez.email = "nida.amir0083@gmail.com"
+
+# ========== BACKGROUND IMAGE FUNCTION ==========
+def add_bg_from_local(image_file):
+    with open(image_file, "rb") as f:
+        img_data = f.read()
+    b64_encoded = base64.b64encode(img_data).decode()
+    st.markdown(
+        f"""
+        <style>
+        .stApp {{
+            background-image: url(data:image/png;base64,{b64_encoded});
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        .main {{
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 2rem;
+            border-radius: 10px;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Or use this version for online image
+def add_bg_from_url(url):
+    st.markdown(
+         f"""
+         <style>
+         .stApp {{
+             background-image: url("{url}");
+             background-size: cover;
+             background-position: center;
+             background-repeat: no-repeat;
+             background-attachment: fixed;
+         }}
+         .main {{
+             background-color: rgba(255, 255, 255, 0.9);
+             padding: 2rem;
+             border-radius: 10px;
+         }}
+         </style>
+         """,
+         unsafe_allow_html=True
+     )
+
+# Choose one background method:
+# add_bg_from_local("background.jpg")  # Place image file in same directory
+add_bg_from_url("https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3")
 
 # ========== FUNCTION DEFINITIONS ==========
 @st.cache_resource(show_spinner=False)
@@ -158,55 +210,60 @@ else:
     qa_enabled = True
 
 # ========== APP LAYOUT ==========
-st.title("🔬 Find Your Research")
+st.markdown("""
+<style>
+h1, h2, h3, h4, h5, h6 {
+    color: #2E7D32 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Search input
-topic = st.text_input("Enter a research topic:", 
-                     value="drug repurposing for anaplastic thyroid cancer",
-                     help="Try medical or scientific topics")
-
-if st.button("Search", type="primary") or topic:
-    with st.spinner("Searching PubMed, arXiv, and Wikipedia..."):
-        data = build_merged_report(topic)
+# Main container with semi-transparent background
+with st.container():
+    st.title("🔬 Find Your Research")
     
-    if data:
-        st.success(f"Found {len(data)} results")
-        st.subheader("Research Results")
-        display_compact_results(data)
+    # Search input
+    topic = st.text_input("Enter a research topic:", 
+                         value="drug repurposing for anaplastic thyroid cancer",
+                         help="Try medical or scientific topics")
+    
+    if st.button("Search", type="primary") or topic:
+        with st.spinner("Searching PubMed, arXiv, and Wikipedia..."):
+            data = build_merged_report(topic)
         
-        st.subheader("Detailed View")
-        with st.expander(f"View {data[0]['source']} content", expanded=True):
-            if 'abstract' in data[0] and data[0]['abstract']:
-                st.write(data[0]['abstract'])
-            elif 'summary' in data[0]:
-                st.write(data[0]['summary'])
-            else:
-                st.warning("No content available for this result")
-        
-        if qa_enabled:
-            st.subheader("Ask About This Research")
-            question = st.text_input("Your question:", 
-                                   value="What are the key findings?",
-                                   key="question_input")
+        if data:
+            st.success(f"Found {len(data)} results")
+            st.subheader("Research Results")
+            display_compact_results(data)
             
-            if st.button("Get Answer", type="primary"):
-                context = data[0].get('abstract', data[0].get('summary', ''))
-                if context:
-                    try:
-                        answer = qa_pipeline(
-                            f"question: {question} context: {context}", 
-                            max_new_tokens=200
-                        )[0]["generated_text"]
-                        st.info(f"**Answer:** {answer}")
-                    except Exception as e:
-                        st.error(f"Error generating answer: {str(e)}")
+            st.subheader("Detailed View")
+            with st.expander(f"View {data[0]['source']} content", expanded=True):
+                if 'abstract' in data[0] and data[0]['abstract']:
+                    st.write(data[0]['abstract'])
+                elif 'summary' in data[0]:
+                    st.write(data[0]['summary'])
                 else:
-                    st.warning("No content available to generate an answer.")
+                    st.warning("No content available for this result")
+            
+            if qa_enabled:
+                st.subheader("Ask About This Research")
+                question = st.text_input("Your question:", 
+                                       value="What are the key findings?",
+                                       key="question_input")
+                
+                if st.button("Get Answer", type="primary"):
+                    context = data[0].get('abstract', data[0].get('summary', ''))
+                    if context:
+                        try:
+                            answer = qa_pipeline(
+                                f"question: {question} context: {context}", 
+                                max_new_tokens=200
+                            )[0]["generated_text"]
+                            st.info(f"**Answer:** {answer}")
+                        except Exception as e:
+                            st.error(f"Error generating answer: {str(e)}")
+                    else:
+                        st.warning("No content available to generate an answer.")
 
 st.markdown("---")
 st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
-
- 
-
-
-
