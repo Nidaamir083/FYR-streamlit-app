@@ -1,7 +1,9 @@
-streamlit>=1.29.0
-pandas>=2.0.0
-wikipedia>=1.4.0
-arxiv>=2.1.0
-biopython>=1.81
-transformers>=4.26.1
-torch>=2.0.1
+streamlit==1.22.0
+pandas==1.5.3
+wikipedia==1.4.0
+arxiv==1.4.3
+biopython==1.79
+transformers==4.26.1
+torch==2.0.1
+sentencepiece==0.1.97
+protobuf==3.20.3
