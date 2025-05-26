@@ -77,60 +77,146 @@ st.set_page_config(
     page_icon="🔬"
 )
 
-# Load model (after function definitions but before main app)
+# Load model
 qa_pipeline = load_model()
 
-# ========== APP LAYOUT ==========
+# ========== CUSTOM STYLING ==========
 background_url = "https://astrixinc.com/wp-content/uploads/2025/04/AI-Image-1.jpg"
 st.markdown(
     f"""
     <style>
+    /* Background styling */
     .stApp {{
         background-image: url("{background_url}");
         background-size: cover;
         background-attachment: fixed;
         background-position: center;
     }}
+    
+    /* Main container styling */
     .main .block-container {{
-        background-color: rgba(255, 255, 255, 0.9);
-        border-radius: 10px;
+        background-color: rgba(255, 255, 255, 0.95);
+        border-radius: 15px;
         padding: 2rem;
-        margin-top: 2rem;
-        margin-bottom: 2rem;
+        margin: 2rem auto;
+        max-width: 90%;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }}
-    h1, h2, h3 {{
-        color: #2c3e50;
+    
+    /* Title styling */
+    .title {{
+        color: #2E7D32 !important;
+        text-align: center;
+        font-size: 2.8rem !important;
+        margin-bottom: 1.5rem;
+        text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+    }}
+    
+    /* Header styling */
+    h2, h3 {{
+        color: #1B5E20 !important;
+        border-bottom: 2px solid #4CAF50;
+        padding-bottom: 0.5rem;
+    }}
+    
+    /* Table styling */
+    .stDataFrame {{
+        max-height: 400px;
+        overflow: auto;
+        margin: 1rem 0;
+    }}
+    
+    /* Table header */
+    .stDataFrame thead th {{
+        background-color: #2E7D32 !important;
+        color: white !important;
+        position: sticky;
+        top: 0;
+        font-weight: 600;
+    }}
+    
+    /* Table cells */
+    .stDataFrame tbody td {{
+        color: #333 !important;
+        font-size: 0.95rem !important;
+    }}
+    
+    /* Hover effect */
+    .stDataFrame tbody tr:hover {{
+        background-color: #E8F5E9 !important;
+    }}
+    
+    /* Input fields */
+    .stTextInput input {{
+        background-color: rgba(255,255,255,0.9) !important;
+    }}
+    
+    /* Button styling */
+    .stButton>button {{
+        background-color: #2E7D32 !important;
+        color: white !important;
+        border: none;
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        font-weight: 500;
+    }}
+    .stButton>button:hover {{
+        background-color: #1B5E20 !important;
     }}
     </style>
     """,
     unsafe_allow_html=True
 )
 
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>🔬 Find Your Research</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center;'>Welcome to FYR!</h3>", unsafe_allow_html=True)
+# ========== APP LAYOUT ==========
+st.markdown('<h1 class="title">🔬 Find Your Research</h1>', unsafe_allow_html=True)
+st.markdown('<h3 style="text-align: center; color: #1B5E20;">Welcome to FYR - Your Research Companion</h3>', unsafe_allow_html=True)
 
 # ========== MAIN APP LOGIC ==========
-topic = st.text_input("Enter a research topic:", "drug repurposing for anaplastic thyroid cancer")
+with st.container():
+    topic = st.text_input("Enter a research topic:", "drug repurposing for anaplastic thyroid cancer")
 
 if topic:
-    with st.spinner("Fetching data..."):
+    with st.spinner("🔍 Searching across PubMed, arXiv, and Wikipedia..."):
         data = build_merged_report(topic)
-    st.success("Data fetched successfully!")
-
+    
+    st.success("✅ Data fetched successfully!")
+    
+    # Display results in a compact table
     st.subheader("📊 Source Distribution")
     visualize_results(data)
-
-    st.subheader("📚 Sources")
-    for doc in data:
-        st.markdown(f"- **{doc.get('source')}**: {doc.get('title', doc.get('abstract', doc.get('summary', 'N/A')))[:80]}...")
-
+    
+    st.subheader("📚 Research Results")
+    df = pd.DataFrame(data)[['source', 'title', 'date']]
+    st.dataframe(
+        df,
+        height=350,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "source": st.column_config.TextColumn("Source", width="small"),
+            "title": st.column_config.TextColumn("Title", width="large"),
+            "date": st.column_config.DatetimeColumn("Date", width="small")
+        }
+    )
+    
     st.subheader("🧠 Ask a Scientific Question")
-    question = st.text_input("What would you like to ask?", "What AI tools are used in the diagnosis of Thyroid cancer?")
-    if st.button("Get Answer"):
-        context_texts = " ".join(doc.get('summary', '') or doc.get('abstract', '') for doc in data)[:4000]
-        answer = ask_scientific_question(question, context_texts)
-        st.markdown("### 🤖 Answer")
-        st.write(answer)
+    question = st.text_input("What would you like to ask about this research?", 
+                           "What AI tools are used in the diagnosis of Thyroid cancer?")
+    
+    if st.button("Get Answer", type="primary"):
+        with st.spinner("🤖 Analyzing research and generating answer..."):
+            context_texts = " ".join(doc.get('summary', '') or doc.get('abstract', '') for doc in data)[:4000]
+            answer = ask_scientific_question(question, context_texts)
+            
+            st.markdown("### 💡 Answer")
+            st.markdown(f'<div style="background-color: #E8F5E9; padding: 1rem; border-radius: 8px; border-left: 4px solid #2E7D32;">{answer}</div>', 
+                       unsafe_allow_html=True)
+
+# Footer
+st.markdown("---")
+st.markdown('<div style="text-align: center; color: #666; font-size: 0.9rem;">Find Your Research © 2024 | Powered by Streamlit</div>', 
+            unsafe_allow_html=True)
         
     
 
