@@ -1,9 +1,16 @@
-streamlit==1.22.0
-pandas==1.5.3
+streamlit==1.33.0
+pandas==2.2.2
 wikipedia==1.4.0
-arxiv==1.4.3
-biopython==1.79
-transformers==4.26.1
-torch==2.0.1
-sentencepiece==0.1.97
-protobuf==3.20.3
+arxiv==2.1.0
+biopython==1.83
+transformers==4.41.2
+torch==2.3.0
+sentencepiece==0.2.0
+protobuf==4.25.3
+numpy==1.26.4
+requests==2.32.3
+markdown-it-py==3.0.0
+mdurl==0.1.2
+rich==14.0.0
+pygments==2.19.1
+accelerate==0.30.1  # Required for efficient model loading
