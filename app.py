@@ -23,7 +23,7 @@ def add_bg_from_local(image_file):
         f"""
         <style>
         .stApp {{
-            background-image: url(data:image/png;base64,{b64_encoded});
+            background-image: url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg";base64,{b64_encoded});
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
