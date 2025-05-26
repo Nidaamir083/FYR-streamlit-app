@@ -151,7 +151,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ========== APP LAYOUT ==========
-st.markdown('<h1 class="title">🔬 Find Your Research</h1>', unsafe_allow_html=True)
+# Replace the existing title markup with this:
+st.markdown('<h1 style="color: black; text-align: center; font-size: 2.5rem;">🔬 Find Your Research</h1>', 
+            unsafe_allow_html=True)
 
 # Search input
 topic = st.text_input("Enter a research topic:", 
