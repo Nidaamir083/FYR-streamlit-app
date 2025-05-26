@@ -1,6 +1,6 @@
 import os
 os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
-os.environ["PYTHONWARNINGS"] = "ignore"  # Suppress warnings
+os.environ["PYTHONWARNINGS"] = "ignore"
 
 import streamlit as st
 import pandas as pd
@@ -10,10 +10,6 @@ from Bio import Entrez
 from transformers import pipeline
 import asyncio
 
-# Disable Streamlit file watcher completely
-st.runtime.legacy_caching.cache_data.clear()
-st.runtime.legacy_caching.cache_resource.clear()
-
 # Initialize Entrez
 Entrez.email = "nida.amir0083@gmail.com"
 
@@ -21,10 +17,11 @@ Entrez.email = "nida.amir0083@gmail.com"
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
-        # Explicitly set device to CPU to avoid any GPU-related issues
-        return pipeline("text2text-generation", 
-                      model="google/flan-t5-base",
-                      device="cpu")
+        return pipeline(
+            "text2text-generation", 
+            model="google/flan-t5-base",
+            device="cpu"
+        )
     except Exception as e:
         st.error(f"Model loading failed: {str(e)}")
         return None
@@ -41,26 +38,35 @@ def fetch_pubmed_articles(query, max_results=5):
         records = Entrez.read(handle)
         
         articles = []
-        for i, paper in enumerate(records['PubmedArticle']):
+        for paper in records['PubmedArticle']:
             # Extract title
-            title = paper['MedlineCitation']['Article']['ArticleTitle']
+            title = str(paper['MedlineCitation']['Article']['ArticleTitle'])
             
             # Extract abstract if available
             abstract = ""
             if 'Abstract' in paper['MedlineCitation']['Article']:
-                abstract = ' '.join(
-                    [text.text for text in paper['MedlineCitation']['Article']['Abstract']['AbstractText']]
-                )
+                abstract_texts = []
+                for text in paper['MedlineCitation']['Article']['Abstract']['AbstractText']:
+                    if hasattr(text, 'attributes') and text.attributes.get('Label'):
+                        abstract_texts.append(f"{text.attributes['Label']}: {text}")
+                    else:
+                        abstract_texts.append(str(text))
+                abstract = ' '.join(abstract_texts)
+            
+            # Extract publication date
+            pub_date = None
+            if 'ArticleDate' in paper['MedlineCitation']['Article']:
+                date = paper['MedlineCitation']['Article']['ArticleDate'][0]
+                pub_date = f"{date['Year']}-{date.get('Month','01')}-{date.get('Day','01')}"
             
             articles.append({
                 "source": "PubMed",
                 "title": title,
                 "abstract": abstract,
-                "date": paper['MedlineCitation']['Article']['ArticleDate'][0]['Year'] 
-                if 'ArticleDate' in paper['MedlineCitation']['Article'] else None
+                "date": pub_date
             })
         
-        return articles
+        return articles[:max_results]
         
     except Exception as e:
         st.error(f"PubMed error: {str(e)}")
@@ -88,7 +94,7 @@ def fetch_arxiv_articles(query, max_results=5):
             "source": "arXiv",
             "title": result.title,
             "summary": result.summary,
-            "date": result.published
+            "date": result.published.date()
         } for result in results]
     except Exception as e:
         st.error(f"arXiv error: {str(e)}")
@@ -136,10 +142,17 @@ st.set_page_config(
     page_icon="🔬"
 )
 
+# Initialize asyncio event loop
+try:
+    loop = asyncio.get_event_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 # Load model with error handling
 qa_pipeline = load_model()
 if qa_pipeline is None:
-    st.error("Failed to initialize the AI model. The Q&A feature will be disabled.")
+    st.warning("AI model not available. Q&A feature will be limited.")
     qa_enabled = False
 else:
     qa_enabled = True
@@ -163,10 +176,12 @@ if st.button("Search", type="primary") or topic:
         
         st.subheader("Detailed View")
         with st.expander(f"View {data[0]['source']} content", expanded=True):
-            if 'abstract' in data[0]:
+            if 'abstract' in data[0] and data[0]['abstract']:
                 st.write(data[0]['abstract'])
-            else:
+            elif 'summary' in data[0]:
                 st.write(data[0]['summary'])
+            else:
+                st.warning("No content available for this result")
         
         if qa_enabled:
             st.subheader("Ask About This Research")
@@ -190,5 +205,8 @@ if st.button("Search", type="primary") or topic:
 
 st.markdown("---")
 st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
+
+ 
+
 
 
