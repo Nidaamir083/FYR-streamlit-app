@@ -1,14 +1,18 @@
-import os
-os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
-os.environ["PYTHONWARNINGS"] = "ignore"
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
+# ===== ABSOLUTELY FIRST COMMANDS =====
 import streamlit as st
+
+# MUST be the very first Streamlit command
 st.set_page_config(
-    page_title="Find Your Research", 
+    page_title="Find Your Research",
     layout="centered",
     page_icon="🔬"
 )
 
+# ===== NOW SAFE TO IMPORT OTHER LIBS =====
+import os
 import pandas as pd
 import wikipedia
 import arxiv
@@ -17,74 +21,65 @@ from transformers import pipeline
 import asyncio
 import base64
 
+# ===== ENVIRONMENT CONFIG =====
+os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
+os.environ["PYTHONWARNINGS"] = "ignore"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # Initialize Entrez
 Entrez.email = "nida.amir0083@gmail.com"
 
-# ========== BACKGROUND IMAGE FUNCTION ==========
-
-# Or use this version for online image
+# ===== FUNCTION DEFINITIONS =====
 def add_bg_from_url(url):
     st.markdown(
-         f"""
-         <style>
-         .stApp {{
-             background-image: url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg");
-             background-size: cover;
-             background-position: center;
-             background-repeat: no-repeat;
-             background-attachment: fixed;
-         }}
-         .main {{
-             background-color: rgba(255, 255, 255, 0.9);
-             padding: 2rem;
-             border-radius: 10px;
-         }}
-         </style>
-         """,
-         unsafe_allow_html=True
-     )
+        f"""
+        <style>
+        .stApp {{
+            background-image: url("{url}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }}
+        .main {{
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 2rem;
+            border-radius: 10px;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Choose one background method:
-# add_bg_from_local("background.jpg")  # Place image file in same directory
-add_bg_from_url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg")
-
-# ========== FUNCTION DEFINITIONS ==========
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         return pipeline(
             "text2text-generation", 
             model="google/flan-t5-base",
             device="cpu",
-            torch_dtype="auto"
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
         )
     except Exception as e:
         st.error(f"Model loading failed: {str(e)}")
         return None
 
-try:
-    from transformers import pipeline
-except ImportError as e:
-    st.error(f"Import error: {str(e)}. Please check requirements.txt")
-    st.stop()
-
 def fetch_pubmed_articles(query, max_results=5):
     try:
-        # Search PubMed
         handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
         record = Entrez.read(handle)
         ids = record["IdList"]
         
-        # Fetch details including titles
         handle = Entrez.efetch(db="pubmed", id=ids, retmode="xml")
         records = Entrez.read(handle)
         
         articles = []
         for paper in records['PubmedArticle']:
-            # Extract title
             title = str(paper['MedlineCitation']['Article']['ArticleTitle'])
             
-            # Extract abstract if available
             abstract = ""
             if 'Abstract' in paper['MedlineCitation']['Article']:
                 abstract_texts = []
@@ -95,7 +90,6 @@ def fetch_pubmed_articles(query, max_results=5):
                         abstract_texts.append(str(text))
                 abstract = ' '.join(abstract_texts)
             
-            # Extract publication date
             pub_date = None
             if 'ArticleDate' in paper['MedlineCitation']['Article']:
                 date = paper['MedlineCitation']['Article']['ArticleDate'][0]
@@ -109,7 +103,6 @@ def fetch_pubmed_articles(query, max_results=5):
             })
         
         return articles[:max_results]
-        
     except Exception as e:
         st.error(f"PubMed error: {str(e)}")
         return []
@@ -155,7 +148,6 @@ def display_compact_results(data):
     
     df = pd.DataFrame(data)
     
-    # Convert date to datetime if it exists
     if 'date' in df.columns:
         df['date'] = pd.to_datetime(df['date'], errors='coerce')
     
@@ -177,83 +169,78 @@ def display_compact_results(data):
         }
     )
 
-# ========== APP CONFIGURATION ==========
-st.set_page_config(
-    page_title="Find Your Research", 
-    layout="centered",
-    page_icon="🔬"
-)
-
-# Initialize asyncio event loop
-try:
-    loop = asyncio.get_event_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-# Load model with error handling
-qa_pipeline = load_model()
-if qa_pipeline is None:
-    st.warning("AI model not available. Q&A feature will be limited.")
-    qa_enabled = False
-else:
-    qa_enabled = True
-
-# ========== APP LAYOUT ==========
-st.markdown("""
-<style>
-h1, h2, h3, h4, h5, h6 {
-    color: #2E7D32 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Main container with semi-transparent background
-with st.container():
-    st.title("🔬 Find Your Research")
+# ===== MAIN APP =====
+def main():
+    # Set background
+    add_bg_from_url("https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3")
     
-    # Search input
-    topic = st.text_input("Enter a research topic:", 
-                         value="drug repurposing for anaplastic thyroid cancer",
-                         help="Try medical or scientific topics")
+    # Initialize asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     
-    if st.button("Search", type="primary") or topic:
-        with st.spinner("Searching PubMed, arXiv, and Wikipedia..."):
-            data = build_merged_report(topic)
+    # Load model
+    qa_pipeline = load_model()
+    qa_enabled = qa_pipeline is not None
+    
+    # App layout
+    st.markdown("""
+    <style>
+    h1, h2, h3, h4, h5, h6 {
+        color: #2E7D32 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    with st.container():
+        st.title("🔬 Find Your Research")
         
-        if data:
-            st.success(f"Found {len(data)} results")
-            st.subheader("Research Results")
-            display_compact_results(data)
+        topic = st.text_input("Enter a research topic:", 
+                             value="drug repurposing for anaplastic thyroid cancer",
+                             help="Try medical or scientific topics")
+        
+        if st.button("Search", type="primary") or topic:
+            with st.spinner("Searching PubMed, arXiv, and Wikipedia..."):
+                data = build_merged_report(topic)
             
-            st.subheader("Detailed View")
-            with st.expander(f"View {data[0]['source']} content", expanded=True):
-                if 'abstract' in data[0] and data[0]['abstract']:
-                    st.write(data[0]['abstract'])
-                elif 'summary' in data[0]:
-                    st.write(data[0]['summary'])
-                else:
-                    st.warning("No content available for this result")
-            
-            if qa_enabled:
-                st.subheader("Ask About This Research")
-                question = st.text_input("Your question:", 
-                                       value="What are the key findings?",
-                                       key="question_input")
+            if data:
+                st.success(f"Found {len(data)} results")
+                st.subheader("Research Results")
+                display_compact_results(data)
                 
-                if st.button("Get Answer", type="primary"):
-                    context = data[0].get('abstract', data[0].get('summary', ''))
-                    if context:
-                        try:
-                            answer = qa_pipeline(
-                                f"question: {question} context: {context}", 
-                                max_new_tokens=200
-                            )[0]["generated_text"]
-                            st.info(f"**Answer:** {answer}")
-                        except Exception as e:
-                            st.error(f"Error generating answer: {str(e)}")
+                st.subheader("Detailed View")
+                with st.expander(f"View {data[0]['source']} content", expanded=True):
+                    if 'abstract' in data[0] and data[0]['abstract']:
+                        st.write(data[0]['abstract'])
+                    elif 'summary' in data[0]:
+                        st.write(data[0]['summary'])
                     else:
-                        st.warning("No content available to generate an answer.")
+                        st.warning("No content available for this result")
+                
+                if qa_enabled:
+                    st.subheader("Ask About This Research")
+                    question = st.text_input("Your question:", 
+                                           value="What are the key findings?",
+                                           key="question_input")
+                    
+                    if st.button("Get Answer", type="primary"):
+                        context = data[0].get('abstract', data[0].get('summary', ''))
+                        if context:
+                            try:
+                                answer = qa_pipeline(
+                                    f"question: {question} context: {context}", 
+                                    max_new_tokens=200
+                                )[0]["generated_text"]
+                                st.info(f"**Answer:** {answer}")
+                            except Exception as e:
+                                st.error(f"Error generating answer: {str(e)}")
+                        else:
+                            st.warning("No content available to generate an answer.")
 
-st.markdown("---")
-st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
+    st.markdown("---")
+    st.caption("© 2024 Find Your Research | Data sources: PubMed, arXiv, Wikipedia")
+
+if __name__ == "__main__":
+    main()
