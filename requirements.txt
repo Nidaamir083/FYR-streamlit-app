@@ -1,8 +1,7 @@
-streamlit>=1.29.0
-pandas>=2.0.0
-wikipedia>=1.4.0
-arxiv>=2.1.0
-biopython>=1.81
-transformers>=4.30.0
-torch>=2.0.0
-pillow>=10.0.0
+streamlit==1.29.0
+pandas==2.0.3
+wikipedia==1.4.0
+arxiv==2.1.0
+biopython==1.81
+transformers==4.30.2
+torch==2.0.1
