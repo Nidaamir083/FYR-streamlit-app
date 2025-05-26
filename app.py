@@ -31,13 +31,37 @@ def load_model():
 
 def fetch_pubmed_articles(query, max_results=5):
     try:
+        # Search PubMed
         handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
         record = Entrez.read(handle)
         ids = record["IdList"]
-        handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
-        abstracts = [a.strip() for a in handle.read().split("\n\n") if len(a.strip()) > 100]
-        return [{"source": "PubMed", "title": f"PubMed {i+1}", "abstract": abstract} 
-               for i, abstract in enumerate(abstracts)]
+        
+        # Fetch details including titles
+        handle = Entrez.efetch(db="pubmed", id=ids, retmode="xml")
+        records = Entrez.read(handle)
+        
+        articles = []
+        for i, paper in enumerate(records['PubmedArticle']):
+            # Extract title
+            title = paper['MedlineCitation']['Article']['ArticleTitle']
+            
+            # Extract abstract if available
+            abstract = ""
+            if 'Abstract' in paper['MedlineCitation']['Article']:
+                abstract = ' '.join(
+                    [text.text for text in paper['MedlineCitation']['Article']['Abstract']['AbstractText']]
+                )
+            
+            articles.append({
+                "source": "PubMed",
+                "title": title,
+                "abstract": abstract,
+                "date": paper['MedlineCitation']['Article']['ArticleDate'][0]['Year'] 
+                if 'ArticleDate' in paper['MedlineCitation']['Article'] else None
+            })
+        
+        return articles
+        
     except Exception as e:
         st.error(f"PubMed error: {str(e)}")
         return []
@@ -82,8 +106,10 @@ def display_compact_results(data):
         return
     
     df = pd.DataFrame(data)
-    if 'date' not in df.columns:
-        df['date'] = pd.NaT
+    
+    # Convert date to datetime if it exists
+    if 'date' in df.columns:
+        df['date'] = pd.to_datetime(df['date'], errors='coerce')
     
     display_df = df[['source', 'title', 'date']].rename(columns={
         'source': 'Source',
