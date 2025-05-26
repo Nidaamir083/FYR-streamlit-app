@@ -21,29 +21,6 @@ import base64
 Entrez.email = "nida.amir0083@gmail.com"
 
 # ========== BACKGROUND IMAGE FUNCTION ==========
-def add_bg_from_local(image_file):
-    with open(image_file, "rb") as f:
-        img_data = f.read()
-    b64_encoded = base64.b64encode(img_data).decode()
-    st.markdown(
-        f"""
-        <style>
-        .stApp {{
-            background-image: url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg";base64,{b64_encoded});
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            background-attachment: fixed;
-        }}
-        .main {{
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 2rem;
-            border-radius: 10px;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
 # Or use this version for online image
 def add_bg_from_url(url):
@@ -51,7 +28,7 @@ def add_bg_from_url(url):
          f"""
          <style>
          .stApp {{
-             background-image: url("{url}");
+             background-image: url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg");
              background-size: cover;
              background-position: center;
              background-repeat: no-repeat;
@@ -69,7 +46,7 @@ def add_bg_from_url(url):
 
 # Choose one background method:
 # add_bg_from_local("background.jpg")  # Place image file in same directory
-add_bg_from_url("https://images.unsplash.com/photo-1532094349884-543bc11b234d?ixlib=rb-4.0.3")
+add_bg_from_url("https://as1.ftcdn.net/v2/jpg/12/48/73/66/1000_F_1248736663_1Y9NvuenMh1HvLwA9bcw4VklrrBRetxJ.jpg")
 
 # ========== FUNCTION DEFINITIONS ==========
 @st.cache_resource(show_spinner=False)
@@ -78,11 +55,18 @@ def load_model():
         return pipeline(
             "text2text-generation", 
             model="google/flan-t5-base",
-            device="cpu"
+            device="cpu",
+            torch_dtype="auto"
         )
     except Exception as e:
         st.error(f"Model loading failed: {str(e)}")
         return None
+
+try:
+    from transformers import pipeline
+except ImportError as e:
+    st.error(f"Import error: {str(e)}. Please check requirements.txt")
+    st.stop()
 
 def fetch_pubmed_articles(query, max_results=5):
     try:
