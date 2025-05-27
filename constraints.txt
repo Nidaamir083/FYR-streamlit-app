@@ -1,0 +1,4 @@
+rich==13.7.1
+markdown-it-py==2.2.0
+Pygments==2.17.2
+mdurl==0.1.2
