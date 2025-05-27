@@ -1,3 +1,4 @@
+pip>=24.0
 streamlit==1.33.0
 pandas==2.1.4
 wikipedia==1.4.0
