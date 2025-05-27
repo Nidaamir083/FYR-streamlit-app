@@ -1,11 +1,16 @@
 streamlit==1.33.0
-pandas==2.1.4  # Version with pre-built wheels
+pandas==2.1.4
 wikipedia==1.4.0
 arxiv==2.1.0
 biopython==1.83
 transformers==4.41.2
-torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu  # Lighter CPU-only version
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu
 sentencepiece==0.2.0
-protobuf==3.20.3  # Stable version known to work
+protobuf==3.20.3
 numpy==1.26.4
 accelerate==0.30.1
+# Explicitly add these with pinned versions to prevent conflicts
+rich==13.7.1  # Slightly older but more stable version
+markdown-it-py==2.2.0
+Pygments==2.17.2
+mdurl==0.1.2
