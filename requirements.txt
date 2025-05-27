@@ -1,16 +1,11 @@
 streamlit==1.33.0
-pandas==2.2.2
+pandas==2.0.3  # More stable version with pre-built wheels
 wikipedia==1.4.0
 arxiv==2.1.0
 biopython==1.83
 transformers==4.41.2
-torch==2.3.0
+torch==2.2.2  # Lighter version that works well with Streamlit Cloud
 sentencepiece==0.2.0
-protobuf==4.25.3
+protobuf>=3.20.0,<4.25.0  # Avoid protobuf 4.25.x due to known issues
 numpy==1.26.4
-requests==2.32.3
-markdown-it-py==3.0.0
-mdurl==0.1.2
-rich==14.0.0
-pygments==2.19.1
-accelerate==0.30.1  # Required for efficient model loading
+accelerate==0.30.1
