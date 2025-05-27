@@ -1,11 +1,11 @@
 streamlit==1.33.0
-pandas==2.0.3  # More stable version with pre-built wheels
+pandas==2.1.4  # Version with pre-built wheels
 wikipedia==1.4.0
 arxiv==2.1.0
 biopython==1.83
 transformers==4.41.2
-torch==2.2.2  # Lighter version that works well with Streamlit Cloud
+torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu  # Lighter CPU-only version
 sentencepiece==0.2.0
-protobuf>=3.20.0,<4.25.0  # Avoid protobuf 4.25.x due to known issues
+protobuf==3.20.3  # Stable version known to work
 numpy==1.26.4
 accelerate==0.30.1
