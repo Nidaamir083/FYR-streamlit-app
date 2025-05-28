@@ -1,271 +1,170 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+import os
+os.environ["STREAMLIT_WATCH_FILE_SYSTEM"] = "false"
 
 import streamlit as st
-import os
+from PIL import Image
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 import wikipedia
 import arxiv
 from Bio import Entrez
 from transformers import pipeline
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import time
-import base64
 
-# ===== ABSOLUTELY FIRST CONFIG =====
+# Set page config FIRST (before any other Streamlit commands)
 st.set_page_config(
-    page_title="Find Your Research",
-    layout="centered",
+    page_title="Find Your Research", 
+    layout="wide",
     page_icon="🔬"
 )
 
-# ===== ENVIRONMENT CONFIG =====
-os.environ["TOKENIZERS_PARALLELISM"] = "false"
-Entrez.email = "your-email@example.com"  # Replace with your email
-
-# ===== BACKGROUND IMAGE =====
-def add_bg_from_local(image_path):
-    with open(image_path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode()
-    
+# Add custom CSS for background and styling
+def add_bg_and_css():
     st.markdown(
         f"""
         <style>
         .stApp {{
-            background-image: url(data:image/jpg;base64,{encoded_string});
+            background-image: url("https://framerusercontent.com/images/Kif2pDqp7QTQvgJEDrQFEV2FBAY.jpg?scale-down-to=1024");
             background-size: cover;
             background-attachment: fixed;
+            background-position: center;
         }}
-        .main {{
-            background-color: rgba(255, 255, 255, 0.9);
+        .main .block-container {{
+            background-color: rgba(255, 255, 255, 0.93);
+            border-radius: 15px;
             padding: 2rem;
-            border-radius: 10px;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }}
+        h1, h2, h3 {{
+            color: #2c3e50;
+        }}
+        .stButton>button {{
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            padding: 0.5rem 1rem;
+            border: none;
+        }}
+        .stTextInput>div>div>input {{
+            border-radius: 5px;
+            padding: 0.5rem;
         }}
         </style>
         """,
         unsafe_allow_html=True
     )
 
-# Add background (using local image for Streamlit Cloud)
-add_bg_from_local("background.jpg")  # Add this file to your repo
+add_bg_and_css()
 
-# ===== MODEL LOADING =====
-@st.cache_resource(show_spinner="Loading AI model...")
+# Initialize Entrez
+Entrez.email = "nida.amir0083@gmail.com"
+
+@st.cache_resource
 def load_model():
-    try:
-        return pipeline(
-            "text2text-generation",
-            model="google/flan-t5-base",
-            device="cpu",
-            torch_dtype="auto"
-        )
-    except Exception as e:
-        st.error(f"Model loading failed: {str(e)}")
-        return None
+    return pipeline("text2text-generation", model="google/flan-t5-base")
 
-# ===== API FUNCTIONS WITH RETRY =====
-def retry_api_call(func, max_retries=3, *args, **kwargs):
-    for attempt in range(max_retries):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise e
-            time.sleep(2 ** attempt)
+qa_pipeline = load_model()
 
-def fetch_pubmed_articles(query, max_results=5):
-    try:
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
-        record = Entrez.read(handle)
-        ids = record["IdList"]
-        
-        handle = Entrez.efetch(db="pubmed", id=ids, retmode="xml")
-        records = Entrez.read(handle)
-        
-        articles = []
-        for paper in records['PubmedArticle']:
-            title = str(paper['MedlineCitation']['Article']['ArticleTitle'])
-            abstract = ' '.join(
-                str(text) for text in 
-                paper['MedlineCitation']['Article']['Abstract']['AbstractText']
-            ) if 'Abstract' in paper['MedlineCitation']['Article'] else ""
-            
-            articles.append({
-                "source": "PubMed",
-                "title": title,
-                "abstract": abstract,
-                "date": paper['MedlineCitation']['Article']['ArticleDate'][0]['Year']
-            })
-        
-        return articles
-    except Exception as e:
-        st.toast(f"PubMed error: {str(e)}", icon="⚠️")
-        return []
+def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
+    handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
+                            maxdate=f"{end_year}/12/31", retmax=max_results)
+    record = Entrez.read(handle)
+    ids = record["IdList"]
+    handle = Entrez.efetch(db="pubmed", id=ids, rettype="abstract", retmode="text")
+    abstracts = [a.strip() for a in handle.read().split("\n\n") if len(a.strip()) > 100]
+    return pd.DataFrame({"abstract": abstracts, "source": ["PubMed"] * len(abstracts)})
 
 def get_wikipedia_background(topic):
     try:
-        wikipedia.set_lang("en")
-        search_results = wikipedia.search(topic)
-        if not search_results:
-            return []
-        
-        try:
-            summary = wikipedia.summary(search_results[0], sentences=3)
-            return [{
-                "source": "Wikipedia", 
-                "title": search_results[0], 
-                "summary": summary
-            }]
-        except wikipedia.exceptions.DisambiguationError as e:
-            return [{
-                "source": "Wikipedia",
-                "title": e.options[0],
-                "summary": f"Disambiguation: {e.options[0]}"
-            }]
+        summary = wikipedia.summary(topic, sentences=5)
+        return [{"source": "Wikipedia", "title": topic, "date": topic, "summary": summary}]
     except Exception:
         return []
 
 def fetch_arxiv_articles(query, max_results=5):
-    try:
-        search = arxiv.Search(
-            query=query,
-            max_results=max_results,
-            sort_by=arxiv.SortCriterion.SubmittedDate
-        )
-        return [{
-            "source": "arXiv",
-            "title": result.title,
-            "abstract": result.summary,
-            "date": result.published.date()
-        } for result in search.results()]
-    except Exception as e:
-        st.toast(f"arXiv error: {str(e)}", icon="⚠️")
-        return []
+    search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
+    articles = []
+    for result in search.results():
+        if 2015 <= result.published.year <= 2024:
+            articles.append({
+                "source": "arXiv",
+                "title": result.title,
+                "date": result.published,
+                "summary": result.summary
+            })
+    return articles
 
-# ===== ASYNC DATA FETCHING =====
-async def build_merged_report(topic):
-    loop = asyncio.get_event_loop()
-    
-    with ThreadPoolExecutor() as executor:
-        pubmed_future = loop.run_in_executor(
-            executor, 
-            lambda: retry_api_call(fetch_pubmed_articles, topic)
-        )
-        arxiv_future = loop.run_in_executor(
-            executor, 
-            lambda: retry_api_call(fetch_arxiv_articles, topic)
-        )
-        wiki_future = loop.run_in_executor(
-            executor, 
-            lambda: retry_api_call(get_wikipedia_background, topic)
-        )
-        
-        pubmed, arxiv_articles, wiki = await asyncio.gather(
-            pubmed_future, arxiv_future, wiki_future
-        )
-    
-    return pubmed + arxiv_articles + wiki
+def build_merged_report(topic, pubmed_limit=5, arxiv_limit=5):
+    pubmed = fetch_pubmed_articles(topic, max_results=pubmed_limit)
+    arxiv_articles = fetch_arxiv_articles(topic, max_results=arxiv_limit)
+    wiki = get_wikipedia_background(topic)
+    return pubmed.to_dict('records') + arxiv_articles + wiki
 
-# ===== MAIN APP =====
-def main():
-    st.title("🔬 Find Your Research")
-    
-    # Initialize Q&A model
-    qa_model = load_model()
-    qa_enabled = qa_model is not None
-    
-    # Search interface
-    topic = st.text_input(
-        "Enter a research topic:", 
-        value="drug repurposing",
-        help="Try medical or scientific topics"
-    )
-    
-    if st.button("Search", type="primary"):
-        with st.spinner("Searching across PubMed, arXiv, and Wikipedia..."):
-            try:
-                data = asyncio.run(build_merged_report(topic))
-                
-                if not data:
-                    st.warning("No results found. Try a different search term.")
-                    return
-                
-                # Display results
-                st.success(f"Found {len(data)} results")
-                display_results(data)
-                
-                # Q&A Section
-                if qa_enabled:
-                    st.divider()
-                    st.subheader("Ask About This Research")
-                    
-                    question = st.text_input(
-                        "Your question:", 
-                        value="What are the key findings?",
-                        key="question_input"
-                    )
-                    
-                    if st.button("Get Answer", type="secondary"):
-                        context = data[0].get('abstract') or data[0].get('summary', '')
-                        if context:
-                            with st.spinner("Generating answer..."):
-                                try:
-                                    answer = qa_model(
-                                        f"question: {question} context: {context}",
-                                        max_new_tokens=150
-                                    )[0]["generated_text"]
-                                    st.info(f"**Answer:** {answer}")
-                                except Exception as e:
-                                    st.error(f"Error generating answer: {str(e)}")
-                        else:
-                            st.warning("No content available to answer questions")
-                
-            except Exception as e:
-                st.error(f"Search failed: {str(e)}")
-
-def display_results(data):
+def visualize_results(data):
+    for doc in data:
+        doc['source'] = doc.get('source', 'Unknown')
     df = pd.DataFrame(data)
-    
-    # Clean data
-    df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.date
-    
-    # Display compact view
-    st.dataframe(
-        df[['source', 'title', 'date']],
-        column_config={
-            "source": "Source",
-            "title": "Title",
-            "date": "Date"
-        },
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    # Detailed view
-    with st.expander("View detailed content", expanded=True):
-        tab1, tab2 = st.tabs(["First Result", "All Content"])
-        with tab1:
-            display_article_content(data[0])
-        with tab2:
-            for article in data:
-                st.markdown(f"**{article['title']}** ({article['source']})")
-                display_article_content(article)
-                st.divider()
+    fig, ax = plt.subplots(figsize=(8, 4))
+    sns.countplot(data=df, x='source', order=df['source'].value_counts().index, palette='pastel', ax=ax)
+    for p in ax.patches:
+        ax.annotate(f'{int(p.get_height())}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                    ha='center', va='center', fontsize=11, color='black', xytext=(0, 5),
+                    textcoords='offset points')
+    plt.xticks(rotation=45)
+    plt.title('Sources Distribution', fontsize=14)
+    plt.xlabel('Source', fontsize=12)
+    plt.ylabel('Count', fontsize=12)
+    st.pyplot(fig)
 
-def display_article_content(article):
-    content = article.get('abstract') or article.get('summary', 'No content available')
-    st.write(content)
-    if 'date' in article:
-        st.caption(f"Published: {article['date']}")
+def ask_scientific_question(question, context):
+    prompt = f"Context: {context}\n\nQuestion: {question}"
+    return qa_pipeline(prompt, max_new_tokens=300)[0]["generated_text"].strip()
 
-if __name__ == "__main__":
-    main()
+# App content
+st.markdown("<h1 style='text-align: center; color: #2c3e50;'>🔬 Find Your Research</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: large;'>Discover scientific insights with AI-powered research assistance</p>", unsafe_allow_html=True)
 
+# Sidebar
+with st.sidebar:
+    st.header("Research Settings")
+    topic = st.text_input("Enter a research topic:", "drug repurposing in thyroid cancer")
+    st.markdown("---")
+    st.markdown("### About")
+    st.markdown("This tool helps you find and analyze scientific research using AI.")
 
+# Main content
+if topic:
+    with st.spinner("🔍 Gathering research data..."):
+        data = build_merged_report(topic)
+    st.success("✅ Data fetched successfully!")
+
+    # Visualize the sources
+    st.subheader("📊 Research Sources Overview")
+    visualize_results(data)
+
+    # Ask questions section
+    st.subheader("🤖 Ask a Scientific Question")
+    question = st.text_input("What would you like to ask about this topic?", 
+                           "What AI tools are used in the diagnosis of Thyroid cancer?")
     
-        
-  
-       
+    if st.button("Get Answer", key="ask_question"):
+        with st.spinner("🧠 Analyzing research and formulating answer..."):
+            context_texts = " ".join(doc.get('summary', '') or doc.get('abstract', '') for doc in data)[:4000]
+            answer = ask_scientific_question(question, context_texts)
+            
+            st.markdown("### 📝 Answer")
+            st.markdown(f"""
+            <div style="
+                background-color: #f8f9fa;
+                border-left: 4px solid #4CAF50;
+                padding: 1rem;
+                border-radius: 0 5px 5px 0;
+                margin: 1rem 0;
+            ">
+                {answer}
+            </div>
+            """, unsafe_allow_html=True) 
 
 
