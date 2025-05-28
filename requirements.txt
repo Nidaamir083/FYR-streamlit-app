@@ -7,10 +7,13 @@ wikipedia==1.4.0
 arxiv==1.4.7
 biopython==1.81
 transformers==4.36.2
-torch==2.1.2
+torch==2.1.2 --index-url https://download.pytorch.org/whl/cpu
 requests==2.31.0
 sentencepiece==0.1.99
 protobuf==3.20.3
 numpy==1.26.3
 tqdm==4.66.1
-python-3.10.12
+markdown-it-py==3.0.0
+rich==14.0.0
+mdurl==0.1.2
+Pygments==2.19.1
