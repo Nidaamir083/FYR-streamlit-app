@@ -67,7 +67,7 @@ def load_model():
 
 qa_pipeline = load_model()
 
-def fetch_pubmed_articles(query, start_year=2015, end_year=2024, max_results=20):
+def fetch_pubmed_articles(query, start_year=2015, end_year=2025, max_results=20):
     handle = Entrez.esearch(db="pubmed", term=query, mindate=f"{start_year}/01/01",
                             maxdate=f"{end_year}/12/31", retmax=max_results)
     record = Entrez.read(handle)
@@ -87,7 +87,7 @@ def fetch_arxiv_articles(query, max_results=5):
     search = arxiv.Search(query=query, max_results=max_results, sort_by=arxiv.SortCriterion.Relevance)
     articles = []
     for result in search.results():
-        if 2015 <= result.published.year <= 2024:
+        if 2015 <= result.published.year <= 2025:
             articles.append({
                 "source": "arXiv",
                 "title": result.title,
